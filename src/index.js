@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 
 import { connectDB, getDB } from "./config/database.js";
+import { createDatabaseIndexes } from "./config/indexes.js";
 
 const app = express();
 
@@ -82,8 +83,11 @@ app.use((error, req, res, next) => {
 
 // Start server
 const startServer = async () => {
+
+  
   try {
     await connectDB();
+await createDatabaseIndexes();
 
     app.listen(PORT, () => {
       console.log(`PizzaHub API running on port ${PORT}`);
