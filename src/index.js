@@ -1,78 +1,98 @@
-import cors from "cors";
-import express from "express";
-import { assertConfig, env } from "./config/env.js";
-import { closeDb, connectDb } from "./config/db.js";
-import { webhook } from "./controllers/payment.controller.js";
-import { errorHandler } from "./middleware/error-handler.js";
-import { notFound } from "./middleware/not-found.js";
-import apiRoutes from "./routes/index.js";
+import "dotenv/config";
 
-assertConfig();
+import express from "express";
+import cors from "cors";
+
+import { connectDB, getDB } from "./config/database.js";
 
 const app = express();
 
-app.disable("x-powered-by");
-app.set("trust proxy", 1);
+const PORT =  5000;
 
+// Allowed frontend origins
+const allowedOrigins = (
+  process.env.CLIENT_URL || "http://localhost:10000"
+)
+  .split(",")
+  .map((origin) => origin.trim());
+
+// Middlewares
 app.use(
   cors({
-    origin: env.clientUrls.length > 0 ? env.clientUrls : true,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin not allowed by CORS"));
+    },
     credentials: true,
   })
 );
 
-// Stripe needs the untouched request body, so this route must run before
-// the JSON parser below.
-app.post(
-  `${env.apiPrefix}/payments/webhook`,
-  express.raw({ type: "application/json" }),
-  webhook
-);
+app.use(express.json());
 
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-app.get("/", (_req, res) => {
-  res.json({
-    name: "PizzaHub API",
-    version: "1.0.0",
-    health: `${env.apiPrefix}/health`,
+// Root route
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Welcome to PizzaHub API!",
   });
 });
 
-app.use(env.apiPrefix, apiRoutes);
-
-app.use(notFound);
-app.use(errorHandler);
-
-async function start() {
-  await connectDb();
-
-  const server = app.listen(env.port, () => {
-    console.log(
-      `PizzaHub API listening on http://localhost:${env.port}${env.apiPrefix} [${env.nodeEnv}]`
-    );
+// Server health check
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "PizzaHub API is running.",
   });
+});
 
-  const shutdown = (signal) => {
-    console.log(`${signal} received, shutting down...`);
-    server.close(async () => {
-      await closeDb();
-      process.exit(0);
+// Database health check
+app.get("/api/health/db", async (req, res) => {
+  try {
+    const db = getDB();
+
+    await db.command({ ping: 1 });
+
+    res.status(200).json({
+      success: true,
+      message: "MongoDB connection is working.",
+      database: db.databaseName,
     });
-  };
+  } catch (error) {
+    console.error("Database health check failed:", error);
 
-  process.on("SIGINT", () => shutdown("SIGINT"));
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-}
-
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection:", reason);
+    res.status(500).json({
+      success: false,
+      message: "Database connection failed.",
+    });
+  }
 });
 
-start().catch((error) => {
-  console.error("Failed to start PizzaHub API:", error);
-  process.exit(1);
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error("Server Error:", error.message);
+
+  res.status(500).json({
+    success: false,
+    message: "Internal server error.",
+  });
 });
 
-export default app;
+// Start server
+const startServer = async () => {
+  try {
+    await connectDB();
+
+    app.listen(PORT, () => {
+      console.log(`PizzaHub API running on port ${PORT}`);
+      console.log(`http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Server startup failed:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
