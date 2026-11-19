@@ -107,11 +107,49 @@ export const getPublicMenuItems = async (req, res) => {
 
       collection.countDocuments(filter),
     ]);
+// Fetch vendor information for the menu items
+const vendorIds = [
+  ...new Set(
+    items
+      .map((item) => item.vendorId)
+      .filter((id) => typeof id === "string")
+  ),
+];
+
+const vendors = vendorIds.length
+  ? await db.collection("user").find(
+      { _id: { $in: vendorIds } },
+      {
+        projection: {
+          name: 1,
+          image: 1,
+          businessName: 1,
+        },
+      }
+    ).toArray()
+  : [];
+
+const vendorMap = new Map(
+  vendors.map((vendor) => [
+    vendor._id,
+    {
+      name: vendor.name,
+      businessName: vendor.businessName,
+      image: vendor.image,
+    },
+  ])
+);
+
+const itemsWithVendor = items.map((item) => ({
+  ...item,
+  vendor: vendorMap.get(item.vendorId) || null,
+}));
+
 
     return res.status(200).json({
       success: true,
       message: "Menu items fetched successfully.",
-      data: items,
+     data: itemsWithVendor,
       pagination: {
         currentPage: pageNumber,
         limit: limitNumber,
@@ -125,6 +163,67 @@ export const getPublicMenuItems = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch menu items.",
+    });
+  }
+};
+
+
+// Get one approved and available menu item
+export const getPublicMenuItemById = async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid menu item ID.",
+      });
+    }
+
+    const item = await db.collection("menuItems").findOne({
+      _id: new ObjectId(id),
+      status: "approved",
+      isAvailable: true,
+    });
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Menu item not found or unavailable.",
+      });
+    }
+
+    const vendor = await db.collection("user").findOne(
+      { _id: item.vendorId },
+      {
+        projection: {
+          name: 1,
+          image: 1,
+          businessName: 1,
+        },
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...item,
+        vendor: vendor
+          ? {
+              name: vendor.name,
+              image: vendor.image,
+              businessName: vendor.businessName,
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    console.error("Menu item details error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch menu item details.",
     });
   }
 };
