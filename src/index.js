@@ -5,6 +5,7 @@ import cors from "cors";
 
 import { connectDB, getDB } from "./config/database.js";
 import { createDatabaseIndexes } from "./config/indexes.js";
+import { verifyJWT } from "./middleware/auth.middleware.js";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use(
 );
 
 app.use(express.json());
+
 
 // Root route
 app.get("/", (req, res) => {
@@ -69,6 +71,15 @@ app.get("/api/health/db", async (req, res) => {
       message: "Database connection failed.",
     });
   }
+});
+
+// Protected authentication test
+app.get("/api/auth/me", verifyJWT, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Authentication successful.",
+    user: req.user,
+  });
 });
 
 // Global error handler
