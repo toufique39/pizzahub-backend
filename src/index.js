@@ -6,7 +6,7 @@ import { createDatabaseIndexes } from "./config/indexes.js";
 import { verifyJWT } from "./middleware/auth.middleware.js";
 import menuRoutes from "./routes/menu.routes.js";
 import orderRoutes from "./routes/orders.routes.js";
-
+import vendorRoutes from "./routes/vendor.routes.js";
 
 const app = express();
 
@@ -33,9 +33,16 @@ app.use(
   })
 );
 
+
+
 app.use(express.json());
 app.use("/api/menu-items", menuRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/vendor", vendorRoutes);
+
+
+
+
 // Root route
 app.get("/", (req, res) => {
   res.status(200).json({
