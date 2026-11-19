@@ -158,3 +158,211 @@ export const createOrder = async (req, res) => {
     });
   }
 };
+
+
+// Get orders belonging to the authenticated customer
+export const getMyOrders = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const orders = await db.collection("orders")
+      .find({ customerId: req.user.id })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Fetch vendor information
+    const vendorIds = [
+      ...new Set(
+        orders
+          .map((order) => order.vendorId)
+          .filter((id) => typeof id === "string")
+      ),
+    ];
+
+    const vendorConditions = vendorIds.flatMap((id) => [
+      { _id: id },
+      { id },
+    ]);
+
+    const vendors = vendorConditions.length
+      ? await db.collection("user").find(
+          { $or: vendorConditions },
+          {
+            projection: {
+              name: 1,
+              image: 1,
+              businessName: 1,
+            },
+          }
+        ).toArray()
+      : [];
+
+    const vendorMap = new Map();
+
+    vendors.forEach((vendor) => {
+      const information = {
+        name: vendor.name,
+        image: vendor.image,
+        businessName: vendor.businessName,
+      };
+
+      if (vendor._id) {
+        vendorMap.set(String(vendor._id), information);
+      }
+
+      if (vendor.id) {
+        vendorMap.set(String(vendor.id), information);
+      }
+    });
+
+    const enrichedOrders = orders.map((order) => ({
+      ...order,
+      vendor: vendorMap.get(order.vendorId) || null,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: enrichedOrders.length,
+      data: enrichedOrders,
+    });
+  } catch (error) {
+    console.error("Fetch customer orders error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch your orders.",
+    });
+  }
+};
+
+
+// Get customer dashboard order statistics
+export const getCustomerOrderSummary = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const orders = db.collection("orders");
+
+    const customerFilter = {
+      customerId: req.user.id,
+    };
+
+    const [
+      total,
+      pending,
+      accepted,
+      rejected,
+      cancelled,
+    ] = await Promise.all([
+      orders.countDocuments(customerFilter),
+
+      orders.countDocuments({
+        ...customerFilter,
+        status: "pending",
+      }),
+
+      orders.countDocuments({
+        ...customerFilter,
+        status: "accepted",
+      }),
+
+      orders.countDocuments({
+        ...customerFilter,
+        status: "rejected",
+      }),
+
+      orders.countDocuments({
+        ...customerFilter,
+        status: "cancelled",
+      }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        total,
+        pending,
+        accepted,
+        rejected,
+        cancelled,
+      },
+    });
+  } catch (error) {
+    console.error("Customer summary error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load dashboard statistics.",
+    });
+  }
+};
+
+
+// Cancel an order belonging to the authenticated customer
+export const cancelMyOrder = async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID.",
+      });
+    }
+
+    const orderFilter = {
+      _id: new ObjectId(id),
+      customerId: req.user.id,
+    };
+
+    const order = await db.collection("orders").findOne(orderFilter);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    if (order.status !== "pending") {
+      return res.status(409).json({
+        success: false,
+        message: "Only pending orders can be cancelled.",
+      });
+    }
+
+    const result = await db.collection("orders").updateOne(
+      {
+        ...orderFilter,
+        status: "pending",
+      },
+      {
+        $set: {
+          status: "cancelled",
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Order status changed. Please refresh and try again.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Your order has been cancelled successfully.",
+    });
+  } catch (error) {
+    console.error("Cancel order error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to cancel order.",
+    });
+  }
+};
+

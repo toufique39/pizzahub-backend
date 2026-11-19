@@ -1,6 +1,11 @@
 import { Router } from "express";
 
-import { createOrder } from "../controllers/orders.controller.js";
+import {
+  createOrder,
+  getMyOrders,
+  getCustomerOrderSummary,
+  cancelMyOrder,
+} from "../controllers/orders.controller.js";
 
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
@@ -16,4 +21,28 @@ router.post(
   createOrder
 );
 
+// Customer: View own orders
+router.get(
+  "/my-orders",
+  verifyJWT,
+  requireRole("customer"),
+  getMyOrders
+);
+
+
+// Customer: Dashboard statistics
+router.get(
+  "/summary",
+  verifyJWT,
+  requireRole("customer"),
+  getCustomerOrderSummary
+);
+
+// Customer: Cancel own pending order
+router.patch(
+  "/:id/cancel",
+  verifyJWT,
+  requireRole("customer"),
+  cancelMyOrder
+);
 export default router;
