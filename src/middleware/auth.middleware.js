@@ -4,10 +4,14 @@ import { ObjectId } from "mongodb";
 let JWKS;
 
 function getAuthConfig() {
-  const authBaseURL = process.env.BETTER_AUTH_URL?.replace(/\/+$/, "");
+  const authBaseURL = (
+    process.env.BETTER_AUTH_URL ||
+    process.env.AUTH_BASE_URL ||
+    ""
+  ).replace(/\/+$/, "");
 
   if (!authBaseURL) {
-    throw new Error("AUTH_BASE_URL is not configured.");
+    throw new Error("BETTER_AUTH_URL is not configured.");
   }
 
   if (!JWKS) {

@@ -1,5 +1,10 @@
 import { getDB } from "../config/database.js";
 import { ObjectId } from "mongodb";
+import {
+  buildUserIdFilter,
+  buildUserIdsFilter,
+  normalizeMenuItemLocation,
+} from "../utils/mongo.js";
 const escapeRegex = (value) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -51,14 +56,16 @@ export const getPublicMenuItems = async (req, res) => {
       isAvailable: true,
     };
 
+    // Conditions that may contain their own $or must be combined via $and.
+    const andConditions = [];
+
     // Search by name and description
     if (search.trim()) {
       const regex = new RegExp(escapeRegex(search.trim()), "i");
 
-      filter.$or = [
-        { itemName: regex },
-        { description: regex },
-      ];
+      andConditions.push({
+        $or: [{ itemName: regex }, { description: regex }],
+      });
     }
 
     // Category filter
@@ -66,19 +73,32 @@ export const getPublicMenuItems = async (req, res) => {
       filter.category = category.trim();
     }
 
-    // Location filters
+    // Location filters. Support both the current nested shape and the
+    // legacy top-level `area`/`city` fields.
     if (typeof city === "string" && city.trim()) {
-      filter["location.city"] = {
+      const cityRegex = {
         $regex: `^${escapeRegex(city.trim())}$`,
         $options: "i",
       };
+
+      andConditions.push({
+        $or: [{ "location.city": cityRegex }, { city: cityRegex }],
+      });
     }
 
     if (typeof area === "string" && area.trim()) {
-      filter["location.area"] = {
+      const areaRegex = {
         $regex: `^${escapeRegex(area.trim())}$`,
         $options: "i",
       };
+
+      andConditions.push({
+        $or: [{ "location.area": areaRegex }, { area: areaRegex }],
+      });
+    }
+
+    if (andConditions.length > 0) {
+      filter.$and = andConditions;
     }
 
     // Sorting
@@ -88,7 +108,7 @@ export const getPublicMenuItems = async (req, res) => {
       price_desc: { price: -1 },
     };
 
-    if (!sortOptions[sort]) {
+    if (!Object.prototype.hasOwnProperty.call(sortOptions, sort)) {
       return res.status(400).json({
         success: false,
         message: "Invalid sorting option.",
@@ -107,44 +127,54 @@ export const getPublicMenuItems = async (req, res) => {
 
       collection.countDocuments(filter),
     ]);
-// Fetch vendor information for the menu items
-const vendorIds = [
-  ...new Set(
-    items
-      .map((item) => item.vendorId)
-      .filter((id) => typeof id === "string")
-  ),
-];
 
-const vendors = vendorIds.length
-  ? await db.collection("user").find(
-      { _id: { $in: vendorIds } },
-      {
-        projection: {
-          name: 1,
-          image: 1,
-          businessName: 1,
-        },
+    // Fetch vendor information for the menu items.
+    const vendorIds = [
+      ...new Set(
+        items
+          .map((item) => item.vendorId)
+          .filter((id) => id !== undefined && id !== null && id !== "")
+      ),
+    ];
+
+    const vendorFilter = buildUserIdsFilter(vendorIds);
+
+    const vendors = vendorFilter
+      ? await db.collection("user").find(vendorFilter, {
+          projection: {
+            name: 1,
+            image: 1,
+            businessName: 1,
+          },
+        }).toArray()
+      : [];
+
+    const vendorMap = new Map();
+
+    vendors.forEach((vendor) => {
+      const information = {
+        name: vendor.name,
+        businessName: vendor.businessName,
+        image: vendor.image,
+      };
+
+      if (vendor._id !== undefined) {
+        vendorMap.set(String(vendor._id), information);
       }
-    ).toArray()
-  : [];
 
-const vendorMap = new Map(
-  vendors.map((vendor) => [
-    vendor._id,
-    {
-      name: vendor.name,
-      businessName: vendor.businessName,
-      image: vendor.image,
-    },
-  ])
-);
+      if (vendor.id !== undefined) {
+        vendorMap.set(String(vendor.id), information);
+      }
+    });
 
-const itemsWithVendor = items.map((item) => ({
-  ...item,
-  vendor: vendorMap.get(item.vendorId) || null,
-}));
+    const itemsWithVendor = items.map((item) => {
+      const normalizedItem = normalizeMenuItemLocation(item);
 
+      return {
+        ...normalizedItem,
+        vendor: vendorMap.get(String(normalizedItem.vendorId)) || null,
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -194,21 +224,22 @@ export const getPublicMenuItemById = async (req, res) => {
       });
     }
 
-    const vendor = await db.collection("user").findOne(
-      { _id: item.vendorId },
-      {
-        projection: {
-          name: 1,
-          image: 1,
-          businessName: 1,
-        },
-      }
-    );
+    const vendorFilter = buildUserIdFilter(item.vendorId);
+
+    const vendor = vendorFilter
+      ? await db.collection("user").findOne(vendorFilter, {
+          projection: {
+            name: 1,
+            image: 1,
+            businessName: 1,
+          },
+        })
+      : null;
 
     return res.status(200).json({
       success: true,
       data: {
-        ...item,
+        ...normalizeMenuItemLocation(item),
         vendor: vendor
           ? {
               name: vendor.name,

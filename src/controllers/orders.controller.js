@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/database.js";
+import { buildUserIdsFilter } from "../utils/mongo.js";
 
 export const createOrder = async (req, res) => {
   try {
@@ -74,7 +75,7 @@ export const createOrder = async (req, res) => {
     }
 
     // Prevent vendors from ordering their own items
-    if (item.vendorId === req.user.id) {
+    if (String(item.vendorId) === String(req.user.id)) {
       return res.status(403).json({
         success: false,
         message: "You cannot order your own menu item.",
@@ -117,8 +118,8 @@ export const createOrder = async (req, res) => {
     // Create order
     const order = {
       itemId: new ObjectId(itemId),
-      vendorId: item.vendorId,
-      customerId: req.user.id,
+      vendorId: String(item.vendorId),
+      customerId: String(req.user.id),
 
       itemName: item.itemName,
       itemPrice: item.price,
@@ -175,26 +176,20 @@ export const getMyOrders = async (req, res) => {
       ...new Set(
         orders
           .map((order) => order.vendorId)
-          .filter((id) => typeof id === "string")
+          .filter((id) => id !== undefined && id !== null && id !== "")
       ),
     ];
 
-    const vendorConditions = vendorIds.flatMap((id) => [
-      { _id: id },
-      { id },
-    ]);
+    const vendorFilter = buildUserIdsFilter(vendorIds);
 
-    const vendors = vendorConditions.length
-      ? await db.collection("user").find(
-          { $or: vendorConditions },
-          {
-            projection: {
-              name: 1,
-              image: 1,
-              businessName: 1,
-            },
-          }
-        ).toArray()
+    const vendors = vendorFilter
+      ? await db.collection("user").find(vendorFilter, {
+          projection: {
+            name: 1,
+            image: 1,
+            businessName: 1,
+          },
+        }).toArray()
       : [];
 
     const vendorMap = new Map();
@@ -206,18 +201,18 @@ export const getMyOrders = async (req, res) => {
         businessName: vendor.businessName,
       };
 
-      if (vendor._id) {
+      if (vendor._id !== undefined) {
         vendorMap.set(String(vendor._id), information);
       }
 
-      if (vendor.id) {
+      if (vendor.id !== undefined) {
         vendorMap.set(String(vendor.id), information);
       }
     });
 
     const enrichedOrders = orders.map((order) => ({
       ...order,
-      vendor: vendorMap.get(order.vendorId) || null,
+      vendor: vendorMap.get(String(order.vendorId)) || null,
     }));
 
     return res.status(200).json({

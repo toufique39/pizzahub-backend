@@ -10,14 +10,17 @@ import vendorRoutes from "./routes/vendor.routes.js";
 
 const app = express();
 
-const PORT =  5000;
+const PORT =5000;
 
 // Allowed frontend origins
 const allowedOrigins = (
-  process.env.CLIENT_URL || "http://localhost:10000"
+  process.env.CLIENT_URLS ||
+  process.env.CLIENT_URL ||
+  "http://localhost:10000"
 )
   .split(",")
-  .map((origin) => origin.trim());
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Middlewares
 app.use(

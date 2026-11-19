@@ -178,7 +178,7 @@ export const getVendorOrders = async (req, res, next) => {
       item:
         itemMap.get(String(order.itemId)) || {
           itemName: order.itemName || "Menu item unavailable",
-          price: order.price,
+          price: order.itemPrice ?? order.price ?? 0,
           images: order.itemImage ? [order.itemImage] : [],
         },
     }));
