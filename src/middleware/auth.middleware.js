@@ -1,10 +1,10 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { getDB } from "../config/database.js";
-
+import { ObjectId } from "mongodb";
 let JWKS;
 
 function getAuthConfig() {
-  const authBaseURL = process.env.AUTH_BASE_URL?.replace(/\/+$/, "");
+  const authBaseURL = process.env.BETTER_AUTH_URL?.replace(/\/+$/, "");
 
   if (!authBaseURL) {
     throw new Error("AUTH_BASE_URL is not configured.");
@@ -60,24 +60,48 @@ export const verifyJWT = async (req, res, next) => {
     // This ensures recently blocked users are denied access.
     const db = getDB();
 
-    const user = await db.collection("user").findOne(
-      { _id: userId },
-      {
-        projection: {
-          name: 1,
-          email: 1,
-          role: 1,
-          isBlocked: 1,
-        },
-      }
-    );
+   const userCollection = db.collection("user");
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User account not found.",
-      });
-    }
+// Support string IDs and MongoDB ObjectId IDs
+const idConditions = [
+  { _id: userId },
+  { id: userId },
+];
+
+if (ObjectId.isValid(userId)) {
+  idConditions.push({
+    _id: new ObjectId(userId),
+  });
+}
+
+const user = await userCollection.findOne(
+  {
+    $or: idConditions,
+  },
+  {
+    projection: {
+      name: 1,
+      email: 1,
+      role: 1,
+      isBlocked: 1,
+    },
+  }
+);
+
+if (!user) {
+  console.error("User lookup failed:", {
+    database: db.databaseName,
+    collection: "user",
+    userIdType: typeof userId,
+    userIdLength: userId.length,
+  });
+
+  return res.status(401).json({
+    success: false,
+    message: "User account not found.",
+  });
+}
+    
 
     if (user.isBlocked === true) {
       return res.status(403).json({

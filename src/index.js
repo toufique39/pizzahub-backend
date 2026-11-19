@@ -1,12 +1,13 @@
 import "dotenv/config";
-
 import express from "express";
 import cors from "cors";
-
 import { connectDB, getDB } from "./config/database.js";
 import { createDatabaseIndexes } from "./config/indexes.js";
 import { verifyJWT } from "./middleware/auth.middleware.js";
 import menuRoutes from "./routes/menu.routes.js";
+import orderRoutes from "./routes/orders.routes.js";
+
+
 const app = express();
 
 const PORT =  5000;
@@ -34,7 +35,7 @@ app.use(
 
 app.use(express.json());
 app.use("/api/menu-items", menuRoutes);
-
+app.use("/api/orders", orderRoutes);
 // Root route
 app.get("/", (req, res) => {
   res.status(200).json({
