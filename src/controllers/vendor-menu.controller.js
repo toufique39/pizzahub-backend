@@ -2,6 +2,7 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/database.js";
 import { normalizeMenuItemLocation } from "../utils/mongo.js";
+import { normalizeSubscriptionPlan } from "../utils/subscription.js";
 
 const uploadImageToImgBB = async (file) => {
   const apiKey = process.env.IMGBB_API_KEY;
@@ -201,16 +202,7 @@ const getVendorSubscriptionPlan = async (db, vendorId) => {
     }
   );
 
-  const plan = String(vendor?.subscriptionPlan || "free").toLowerCase();
-
-  // An expired Premium subscription is treated as Free.
-  if (plan === "premium" && vendor?.subscriptionExpiresAt) {
-    if (new Date(vendor.subscriptionExpiresAt).getTime() <= Date.now()) {
-      return "free";
-    }
-  }
-
-  return plan === "premium" ? "premium" : "free";
+  return normalizeSubscriptionPlan(vendor);
 };
 
 // PATCH: Update own menu item

@@ -1,6 +1,7 @@
 
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/database.js";
+import { normalizeSubscriptionPlan } from "../utils/subscription.js";
 
 const getUserIdFilter = (id) => {
   const filters = [{ _id: id }, { id }];
@@ -61,7 +62,7 @@ export const getVendorDashboardSummary = async (req, res, next) => {
         activeMenuItems,
         pendingOrders,
         acceptedOrders,
-        subscriptionPlan: vendor?.subscriptionPlan || "free",
+        subscriptionPlan: normalizeSubscriptionPlan(vendor),
         subscriptionExpiresAt: vendor?.subscriptionExpiresAt || null,
       },
     });
@@ -113,8 +114,13 @@ export const getVendorOrders = async (req, res, next) => {
 
     // Collect customer IDs and item IDs for related information.
     const customerIds = [
-      ...new Set(orders.map((order) => String(order.customerId))),
-    ].filter(Boolean);
+      ...new Set(
+        orders
+          .map((order) => order.customerId)
+          .filter((id) => id !== undefined && id !== null && id !== "")
+          .map((id) => String(id))
+      ),
+    ];
 
     const itemIds = [
       ...new Set(orders.map((order) => String(order.itemId))),

@@ -7,10 +7,11 @@ import { verifyJWT } from "./middleware/auth.middleware.js";
 import menuRoutes from "./routes/menu.routes.js";
 import orderRoutes from "./routes/orders.routes.js";
 import vendorRoutes from "./routes/vendor.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 const app = express();
 
-const PORT =5000;
+const PORT = 5000;
 
 // Allowed frontend origins
 const allowedOrigins = (
@@ -30,7 +31,10 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error("Origin not allowed by CORS"));
+      const error = new Error("Origin not allowed by CORS.");
+      error.status = 403;
+
+      return callback(error);
     },
     credentials: true,
   })
@@ -42,7 +46,7 @@ app.use(express.json());
 app.use("/api/menu-items", menuRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/vendor", vendorRoutes);
-
+app.use("/api/admin", adminRoutes);
 
 
 
@@ -93,13 +97,40 @@ app.get("/api/auth/me", verifyJWT, (req, res) => {
   });
 });
 
+// Unknown routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found.",
+  });
+});
+
 // Global error handler
 app.use((error, req, res, next) => {
-  console.error("Server Error:", error.message);
+  // If the response has already started, let Express finish it.
+  if (res.headersSent) {
+    return next(error);
+  }
 
-  res.status(500).json({
+  const isMulterError = error?.name === "MulterError";
+  const rawStatus = Number(error?.status || error?.statusCode);
+  const status =
+    Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus <= 599
+      ? rawStatus
+      : isMulterError
+        ? 400
+        : 500;
+
+  if (status >= 500) {
+    console.error("Server Error:", error);
+  }
+
+  res.status(status).json({
     success: false,
-    message: "Internal server error.",
+    message:
+      status >= 500
+        ? "Internal server error."
+        : error?.message || "Request failed.",
   });
 });
 

@@ -90,8 +90,8 @@ export const normalizeMenuItemLocation = (item) => {
 
   return {
     ...item,
-    area: item.area ?? location.area,
-    city: item.city ?? location.city,
+    area: location.area,
+    city: location.city,
     location,
   };
 };
