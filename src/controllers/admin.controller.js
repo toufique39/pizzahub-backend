@@ -543,3 +543,128 @@ export const deleteMenuItemByAdmin = async (req, res, next) => {
     next(error);
   }
 };
+
+
+
+// GET: Admin views subscription transactions (read-only)
+export const getAllTransactions = async (req, res, next) => {
+  try {
+    const db = getDB();
+
+    const { status } = req.query;
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+
+    if (
+      status !== undefined &&
+      (typeof status !== "string" ||
+        !/^[a-zA-Z0-9_-]{1,30}$/.test(status))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid transaction status.",
+      });
+    }
+
+    const filter = {};
+
+    if (status) {
+      filter.status = status;
+    }
+
+    const transactionsCollection = db.collection("transactions");
+
+    const [transactions, totalTransactions] = await Promise.all([
+      transactionsCollection
+        .find(filter)
+        .project({
+          vendorId: 1,
+          plan: 1,
+          amount: 1,
+          currency: 1,
+          status: 1,
+          createdAt: 1,
+        })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .toArray(),
+
+      transactionsCollection.countDocuments(filter),
+    ]);
+
+    // Collect vendor IDs from transactions.
+    const vendorIds = [
+      ...new Set(
+        transactions
+          .map((transaction) =>
+            transaction.vendorId
+              ? String(transaction.vendorId)
+              : ""
+          )
+          .filter(Boolean)
+      ),
+    ];
+
+    // Find related vendors.
+    let vendors = [];
+
+    if (vendorIds.length > 0) {
+      const vendorFilters = vendorIds.flatMap((id) => {
+        const filters = [{ _id: id }, { id }];
+
+        if (ObjectId.isValid(id)) {
+          filters.push({ _id: new ObjectId(id) });
+        }
+
+        return filters;
+      });
+
+      vendors = await db.collection("user")
+        .find({
+          $or: vendorFilters,
+          role: "vendor",
+        })
+        .project({
+          name: 1,
+          email: 1,
+          image: 1,
+          businessName: 1,
+          role: 1,
+        })
+        .toArray();
+    }
+
+    // Create a lookup map for vendor information.
+    const vendorMap = new Map();
+
+    vendors.forEach((vendor) => {
+      vendorMap.set(String(vendor._id), vendor);
+
+      if (vendor.id) {
+        vendorMap.set(String(vendor.id), vendor);
+      }
+    });
+
+    // Attach vendor information to each transaction.
+    const enrichedTransactions = transactions.map((transaction) => ({
+      ...transaction,
+      vendor:
+        vendorMap.get(String(transaction.vendorId)) || null,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: enrichedTransactions,
+      pagination: {
+        totalTransactions,
+        currentPage: page,
+        totalPages: Math.ceil(totalTransactions / limit),
+        limit,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -8,6 +8,7 @@ import {
   getAllMenuItems,
   updateMenuItemStatus,
   deleteMenuItemByAdmin,
+  getAllTransactions,
 } from "../controllers/admin.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
@@ -23,7 +24,7 @@ router.patch("/users/:id/status", updateUserBlockStatus);
 router.get("/menu-items", getAllMenuItems);
 router.patch( "/menu-items/:id/status",updateMenuItemStatus);
 router.delete("/menu-items/:id",deleteMenuItemByAdmin);
-
+router.get("/transactions", getAllTransactions);
 
 
 
