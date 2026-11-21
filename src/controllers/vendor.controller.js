@@ -47,25 +47,39 @@ export const getVendorDashboardSummary = async (req, res, next) => {
       db.collection("user").findOne(
         getUserIdFilter(vendorId),
         {
-          projection: {
-            subscriptionPlan: 1,
-            subscriptionExpiresAt: 1,
-          },
+         projection: {
+  subscriptionPlan: 1,
+  subscriptionExpiresAt: 1,
+  subscriptionStatus: 1,
+  subscriptionCancelAtPeriodEnd: 1,
+},
         }
       ),
     ]);
 
-    res.status(200).json({
-      success: true,
-      data: {
-        totalMenuItems,
-        activeMenuItems,
-        pendingOrders,
-        acceptedOrders,
-        subscriptionPlan: normalizeSubscriptionPlan(vendor),
-        subscriptionExpiresAt: vendor?.subscriptionExpiresAt || null,
-      },
-    });
+   const subscriptionExpiry = vendor?.subscriptionExpiresAt
+  ? new Date(vendor.subscriptionExpiresAt)
+  : null;
+
+const isPremiumActive =
+  String(vendor?.subscriptionPlan || "free").toLowerCase() === "premium" &&
+  (!subscriptionExpiry || subscriptionExpiry.getTime() > Date.now());
+
+res.status(200).json({
+  success: true,
+  data: {
+    totalMenuItems,
+    activeMenuItems,
+    pendingOrders,
+    acceptedOrders,
+
+    subscriptionPlan: isPremiumActive ? "premium" : "free",
+    subscriptionStatus: vendor?.subscriptionStatus || "inactive",
+    subscriptionExpiresAt: vendor?.subscriptionExpiresAt || null,
+    subscriptionCancelAtPeriodEnd:
+      Boolean(vendor?.subscriptionCancelAtPeriodEnd),
+  },
+});;
   } catch (error) {
     next(error);
   }

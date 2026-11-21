@@ -48,5 +48,28 @@ export const createDatabaseIndexes = async () => {
     ),
   ]);
 
+  await db.collection("transactions").createIndex(
+  { stripeSessionId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      stripeSessionId: { $type: "string" },
+    },
+    name: "transactions_stripeSessionId_unique",
+  }
+);
+
+
+await db.collection("transactions").createIndex(
+  { stripeInvoiceId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      stripeInvoiceId: { $type: "string" },
+    },
+    name: "transactions_stripeInvoiceId_unique",
+  }
+);
+
   console.log("PizzaHub database indexes created successfully!");
 };

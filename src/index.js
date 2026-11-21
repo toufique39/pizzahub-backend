@@ -8,6 +8,9 @@ import menuRoutes from "./routes/menu.routes.js";
 import orderRoutes from "./routes/orders.routes.js";
 import vendorRoutes from "./routes/vendor.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import stripeWebhookRoutes from "./routes/stripe-webhook.routes.js";
+
+
 
 const app = express();
 
@@ -39,6 +42,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.use("/api/stripe", stripeWebhookRoutes);
 
 
 

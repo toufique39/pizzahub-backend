@@ -8,6 +8,11 @@ import {
 } from "../controllers/vendor.controller.js";
 
 import {
+  createPremiumCheckoutSession,
+  cancelPremiumSubscription,
+} from "../controllers/subscription.controller.js";
+
+import {
   createVendorMenuItem,
   getVendorMenuItems,
   updateVendorMenuItem,
@@ -28,13 +33,12 @@ router.get("/dashboard/summary", getVendorDashboardSummary);
 router.get("/orders", getVendorOrders);
 router.patch("/orders/:id/status", updateVendorOrderStatus);
 router.get("/menu-items", getVendorMenuItems);
-
+router.post("/menu-items",uploadMenuImage.single("image"),createVendorMenuItem,);
+router.post("/subscription/checkout",createPremiumCheckoutSession);
 router.post(
-  "/menu-items",
-  uploadMenuImage.single("image"),
-  createVendorMenuItem,
+  "/subscription/cancel",
+  cancelPremiumSubscription
 );
-
 // Update a menu item (image is optional)
 router.patch(
   "/menu-items/:id",
@@ -50,5 +54,9 @@ router.patch(
   "/menu-items/:id/availability",
   updateVendorMenuAvailability
 );
+
+
+
+
 
 export default router;

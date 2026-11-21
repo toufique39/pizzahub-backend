@@ -646,6 +646,7 @@ export const getAllTransactions = async (req, res, next) => {
         vendorMap.set(String(vendor.id), vendor);
       }
     });
+    
 
     // Attach vendor information to each transaction.
     const enrichedTransactions = transactions.map((transaction) => ({
