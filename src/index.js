@@ -9,7 +9,7 @@ import orderRoutes from "./routes/orders.routes.js";
 import vendorRoutes from "./routes/vendor.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import stripeWebhookRoutes from "./routes/stripe-webhook.routes.js";
-
+import profileRoutes from "./routes/profile.routes.js";
 
 
 const app = express();
@@ -52,7 +52,7 @@ app.use("/api/menu-items", menuRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/admin", adminRoutes);
-
+app.use("/api/profile", profileRoutes);
 
 
 // Root route

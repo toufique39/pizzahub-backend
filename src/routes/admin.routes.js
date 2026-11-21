@@ -1,6 +1,8 @@
 
 import { Router } from "express";
-
+import {
+  getAdminDashboardAnalytics,
+} from "../controllers/admin-analytics.controller.js";
 import {
   getAdminDashboardSummary,
   getAllUsers,
@@ -25,7 +27,10 @@ router.get("/menu-items", getAllMenuItems);
 router.patch( "/menu-items/:id/status",updateMenuItemStatus);
 router.delete("/menu-items/:id",deleteMenuItemByAdmin);
 router.get("/transactions", getAllTransactions);
-
+router.get(
+  "/dashboard/analytics",
+  getAdminDashboardAnalytics
+);
 
 
 export default router;
