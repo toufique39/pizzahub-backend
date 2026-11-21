@@ -141,15 +141,12 @@ app.use((error, req, res, next) => {
 
 // Start server
 const startServer = async () => {
-
-  
   try {
     await connectDB();
-await createDatabaseIndexes();
+    await createDatabaseIndexes();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`PizzaHub API running on port ${PORT}`);
-      console.log(`http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error("Server startup failed:", error.message);
