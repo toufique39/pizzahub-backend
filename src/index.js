@@ -18,9 +18,8 @@ const PORT = 5000;
 
 // Allowed frontend origins
 const allowedOrigins = (
-  process.env.CLIENT_URLS ||
-  process.env.CLIENT_URL ||
-  "http://localhost:10000"
+  process.env.CLIENT_URL 
+  
 )
   .split(",")
   .map((origin) => origin.trim())

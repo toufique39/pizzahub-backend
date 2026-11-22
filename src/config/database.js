@@ -44,11 +44,6 @@ export const connectDB = async () => {
   } catch (error) {
     connectionPromise = null;
 
-    if (client) {
-      await client.close().catch(() => {});
-      client = null;
-    }
-
     throw error;
   }
 };
